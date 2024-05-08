@@ -1,56 +1,44 @@
-from fastapi import FastAPI, Request, Response
-import pickle
-import numpy as np
+import pandas as pd
+import streamlit as st
+import requests
 
-app = FastAPI()
+# Create a Streamlit app
+st.title("Toxicity Detector")
+st.write("Enter a comment to detect its toxicity:")
 
-# Load the TF-IDF vectorizer and the trained random forest model
-with open("tf_idf.pickle", "rb") as f:
-    tf_idf = pickle.load(f)
+# Create a text input field with a fun font
+# comment = st.text_input(
+#     "Comment", height=200, placeholder="Type something toxic...",)
+comment = st.text_area("Comment", height=100,
+                       placeholder="Type something toxic...")
 
-with open("trained_models_rf.pkl", "rb") as f:
-    model = pickle.load(f)
+# Create a button to trigger the prediction
+if st.button("Detect"):
+    # Send a POST request to your FastAPI endpoint
+    response = requests.post(
+        "http://localhost:8000/predict", json={"text": comment})
 
-categories = ["toxic", "severe_toxic", "obscene",
-              "threat", "insult", "identity_hate"]
+    # Parse the response as JSON
+    output = response.json()
 
+    # Create a pandas dataframe to display the results
+    df = pd.DataFrame({"Category": list(output.keys()),
+                      "Toxicity": list(output.values())})
 
-@app.post("/predict")
-async def predict(text: str):
-    """
-    Predict the toxicity of a given text
-    """
-    # Convert the text to a TF-IDF vector
-    vector = tf_idf.transform([text])
+    # Display the results in a table with a fun theme
+    st.write("Toxicity Report:")
+    st.table(df.style.set_properties(
+        **{"background-color": "white", "color": "black", "border-color": "black"}))
 
-    # Make predictions using the trained model
-    prediction = model.predict(vector)[0]
+    # Add some fun emojis to the report
+    if any(value == 1 for value in output.values()):
+        st.write("😬 Oh no! Your comment is toxic! 🚫")
+    else:
+        st.write("🎉 Yay! Your comment is not toxic! 👍")
 
-    # Create a dictionary with the category names and predictions
-    output = {category: int(prediction[i])
-              for i, category in enumerate(categories)}
+# Add some fun features to the app
+st.write("Want to test your toxicity skills? 🤔")
+st.write("Try typing a toxic comment and see how well our model detects it! 😈")
 
-    # Return the output as a JSON response
-    return output
-
-
-@app.post("/predict_batch")
-async def predict_batch(texts: str):
-    """
-    Predict the toxicity of a batch of texts
-    """
-
-    # Convert the texts to TF-IDF vectors
-    vectors = tf_idf.transform(texts)
-
-    # Make predictions using the trained model
-    predictions = model.predict(vectors)
-
-    # Create a list of dictionaries with the category names and predictions
-    output = []
-    for prediction in predictions:
-        output.append({category: int(prediction[i])
-                      for i, category in enumerate(categories)})
-
-    # Return the output as a JSON response
-    return output
+# Add a footer with a fun message
+st.write("Made with ❤️ by [muhammadof9@gmail.com]")
